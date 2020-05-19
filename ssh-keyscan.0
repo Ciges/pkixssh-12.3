@@ -1,0 +1,111 @@
+SSH-KEYSCAN(1)            BSD General Commands Manual           SSH-KEYSCAN(1)
+
+NAME
+     ssh-keyscan -- Gather secure shell public keys
+
+SYNOPSIS
+     ssh-keyscan [-46DHv] [-f file] [-p port] [-T timeout] [-t type]
+                 [host | addrlist namelist]
+
+DESCRIPTION
+     ssh-keyscan is a utility for gathering the public SSH host keys of a num-
+     ber of hosts.  It was designed to aid in building and verifying
+     ssh_known_hosts files, the format of which is documented in sshd(8).
+     ssh-keyscan provides a minimal interface suitable for use by shell and
+     perl scripts.
+
+     ssh-keyscan uses non-blocking socket I/O to contact as many hosts as pos-
+     sible in parallel, so it is very efficient.  The keys from a domain of
+     1,000 hosts can be collected in tens of seconds, even when some of those
+     hosts are down or do not run sshd(8).  For scanning, one does not need
+     login access to the machines that are being scanned, nor does the scan-
+     ning process involve any encryption.
+
+     The options are as follows:
+
+     -4      Force ssh-keyscan to use IPv4 addresses only.
+
+     -6      Force ssh-keyscan to use IPv6 addresses only.
+
+     -D      Print keys found as DNS Resource Records (CERT or SSHFP).  The
+             default is to print keys in a format usable as a ssh(1)
+             known_hosts file.
+
+     -f file
+             Read hosts or ``addrlist namelist'' pairs from file, one per
+             line.  If '-' is supplied instead of a filename, ssh-keyscan will
+             read from the standard input.  Input is expected in the format:
+
+             1.2.3.4,1.2.4.4 name.my.domain,name,n.my.domain,n,1.2.3.4,1.2.4.4
+
+     -H      Hash all hostnames and addresses in the output.  Hashed names may
+             be used normally by ssh(1) and sshd(8), but they do not reveal
+             identifying information should the file's contents be disclosed.
+
+     -p port
+             Connect to port on the remote host.
+
+     -T timeout
+             Set the timeout for connection attempts.  If timeout seconds have
+             elapsed since a connection was initiated to a host or since the
+             last time anything was read from that host, the connection is
+             closed and the host in question considered unavailable.  The
+             default is 5 seconds.
+
+     -t type
+             Specify the host-key algorithms as pattern-list to fetch from the
+             scanned hosts.  See PATTERNS in ssh_config(5) for more informa-
+             tion on patterns.
+
+             The supported host-key algorithms are
+             ``x509v3-ecdsa-sha2-nistp256'', ``x509v3-ecdsa-sha2-nistp384'',
+             ``x509v3-ecdsa-sha2-nistp521'', ``x509v3-sign-rsa'',
+             ``x509v3-ssh-rsa'', ``x509v3-rsa2048-sha256'',
+             ``x509v3-sign-dss'', ``x509v3-ssh-dss'', ``ssh-ed25519'',
+             ``ssh-rsa'', ``rsa-sha2-256'', ``rsa-sha2-512'', ``ssh-dss'',
+             ``ecdsa-sha2-nistp256'', ``ecdsa-sha2-nistp384'', or
+             ``ecdsa-sha2-nistp521''.  The default is ``*'' , i.e. all sup-
+             ported algorithms.
+
+             Note that host-key algorithms ``rsa-sha2-256'', ``rsa-sha2-512'',
+             and ``ssh-rsa'' share one and the same format of host-key.
+
+     -v      Verbose mode: print debugging messages about progress.
+
+     If an ssh_known_hosts file is constructed using ssh-keyscan without veri-
+     fying the keys, users will be vulnerable to man in the middle attacks.
+     On the other hand, if the security model allows such a risk, ssh-keyscan
+     can help in the detection of tampered keyfiles or man in the middle
+     attacks which have begun after the ssh_known_hosts file was created.
+
+FILES
+     /etc/ssh/ssh_known_hosts
+
+EXAMPLES
+     Print the all RSA host-keys for machine hostname:
+
+           $ ssh-keyscan -t '*rsa*' hostname
+
+     Find all hosts from the file ssh_hosts which have new or different keys
+     from those in the sorted file ssh_known_hosts:
+
+           $ ssh-keyscan -f ssh_hosts | \
+                   sort -u - ssh_known_hosts | diff ssh_known_hosts -
+
+SEE ALSO
+     ssh(1), sshd(8)
+
+CONFORMING TO
+     Storing Certificates in the Domain Name System (DNS), RFC 2538, 1999.
+
+     Resource Records for the DNS Security Extensions, RFC 4034, 2005.
+
+     Using DNS to Securely Publish Secure Shell (SSH) Key Fingerprints, RFC
+     4255, 2006.
+
+AUTHORS
+     David Mazieres <dm@lcs.mit.edu> wrote the initial version, Wayne Davison
+     <wayned@users.sourceforge.net> added support for protocol version 2, and
+     Roumen Petrov contributed support for X.509 certificates.
+
+BSD                              June 14, 2018                             BSD

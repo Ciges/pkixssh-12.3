@@ -1,0 +1,62 @@
+Other patches and addons for PKIX-SSH. Please send submissions to
+PKIX-SSH mailing list - ssh_x509@roumenpetrov.info .
+
+Externally maintained
+---------------------
+
+SSH Proxy Command -- connect.c
+
+Shun-ichi GOTO <gotoh@imasy.or.jp> has written a very useful ProxyCommand
+which allows the use of outbound SSH from behind a SOCKS4, SOCKS5 or
+https CONNECT style proxy server. His page for connect.c has extensive
+documentation on its use as well as compiled versions for Win32.
+
+https://bitbucket.org/gotoh/connect/wiki/Home
+
+
+In this directory
+-----------------
+
+ssh-copy-id:
+
+Phil Hands' <phil@hands.com> shell script to automate the process of adding
+your public key to a remote machine's ~/.ssh/authorized_keys file.
+
+ssh-askpass-kdialog:
+
+A born shell passphrase requester that wraps KDialog.
+
+gnome-ssh-askpass[12].c:
+
+A GNOME and GTK+ passphrase requesters. Use "make ssh-askpass-gnome" or
+"make ssh-askpass-gtk+2" or "make ssh-askpass2-gtk+3" to build.
+For compatibility with existing installations you could use
+"make gnome-ssh-askpass1" or "make gnome-ssh-askpass2".
+
+sshd.pam.generic:
+
+A generic PAM config file which may be useful on your system. YMMV
+
+sshd.pam.freebsd:
+
+A PAM config file which works with FreeBSD's PAM port. Contributed by
+Dominik Brettnacher <domi@saargate.de>
+
+aix:
+    Files to build an AIX native (installp or SMIT installable) package.
+
+caldera:
+    RPM spec file and scripts for building Caldera OpenLinuix packages
+
+cygwin:
+    Support files for Cygwin
+
+hpux:
+    Support files for HP-UX
+
+redhat:
+    RPM spec file and scripts for building Redhat packages
+
+suse:
+    RPM spec file and scripts for building SuSE packages
+

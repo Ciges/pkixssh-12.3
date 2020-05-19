@@ -1,0 +1,39 @@
+This is PKIX-SSH - an advanced secure shell implementation.
+
+  https://roumenpetrov.info/secsh
+
+
+Implementation includes some of functionality provided by OpenSSH.
+OpenSSH itself is derivative of  the original and free ssh 1.2.12
+release by Tatu Ylonen. Aaron Campbell, Bob Beck, Markus Friedl,
+Niels Provos, Theo de Raadt, and Dug Song removed many bugs,
+re-added newer features and created OpenSSH.
+Roumen Petrov adds X.509 certificate support, modernize use of
+cryptography library including FIPS mode and creates PKIX-SSH.
+
+Project depend of OpenSSL an excellent cryptography library.
+Precise autoconf based testings of available functionality
+allows PKIX-SSH to work fine not only with current stable releases
+but with upcoming versions or other compatible libraries.
+Ancient versions are still supported.
+
+Functional testing ensures portability to many platforms. The list
+includes but is not limited to Linux, Android, Solaris, BSD variants
+Cygwin, Darwin and AIX.
+
+Enhanced key management allows use of key material stored not only on
+file system, but provided from external sources like PKCS#11 module,
+loadable cryptography module (engine) or OpenSSL store interface.
+Each key material could be used in all supported algorithms.
+For instance each server host-key is announced in all supported and
+allowed algorithms.
+For a key used as client identity adaptive algorithm selection allows
+client to chose automatically most suitable algorithm for connection.
+
+
+Please see INSTALL document for hints how to install PKIX-SSH on you
+platform.
+
+For information how to contribute to project please refer to the
+[Support section](https://roumenpetrov.info/secsh/#support)
+of the project page.

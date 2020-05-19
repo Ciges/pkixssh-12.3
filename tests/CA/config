@@ -1,0 +1,286 @@
+# Copyright (c) 2002-2018 Roumen Petrov, Sofia, Bulgaria
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# DESCRIPTION: SSH X.509 tests configuration.
+#
+
+
+# === setup from build environment:
+. ./env
+
+# === main variables:
+# on some system (with pam?, AIX?, when port is below 1024, etc.) we
+# might use sudo command to start sshd when current user isn`t root or
+# to run tests as root.
+# Preferred user for tests is NOT root :-) !
+SUDO=${SUDO-}
+# uncomment to override environment
+#SUDO=sudo
+
+
+#Old BSD shells, including the Ultrix `sh', don't accept the colon
+#for any shell substitution, and complain and die.
+##TMPDIR="${TMPDIR:-/tmp}"
+
+if test -n "$TMPDIR"; then
+  if test ! -d "$TMPDIR"; then
+    echo "error: $TMPDIR is not directory"
+    exit 1
+  fi
+  if test ! -w "$TMPDIR"; then
+    echo "error: $TMPDIR is not writable"
+    exit 1
+  fi
+else
+  for D in /tmp /var/tmp /usr/tmp; do
+    test -d $D || continue
+    test -w $D || continue
+    TMPDIR=$D
+    break
+  done
+  if test -z "$TMPDIR"; then
+    echo "error: cannot set TMPDIR"
+    exit 1
+  fi
+fi
+
+
+if test -z "$SSH_X509TESTS"; then
+SSH_X509TESTS="\
+ blob_auth
+ dn_auth_file
+ dn_auth_path
+ agent
+ crl
+ self
+ alg
+ hostalg
+ algfmt
+ ocsp
+ by_ldap
+"
+fi
+
+
+# === openssl:
+
+if test -z "${OPENSSL}"; then
+  OPENSSL=`which openssl 2>/dev/null`
+  if test -z "${OPENSSL}"; then
+    echo "error: cannot find openssl is your path !" >&2
+    exit 1
+  fi
+fi
+
+#NOTE: environment variable OPENSSL_FIPS is used as test flag
+# in regression tests
+if test yes = $OPENSSL_FIPS_MODE; then
+  :
+else
+  # unset OPENSSL_FIPS for non-FIPS build, to avoid mis-use
+  # of flag in regression tests
+  unset OPENSSL_FIPS || :
+fi
+
+printf "OpenSSL command: ${attn}%s${norm}\n" "$OPENSSL"
+openssl_version=`$OPENSSL version` || exit $?
+test -z "$openssl_version" && { echo "error: cannot determine OpenSSL version" >&2; exit 1; }
+printf "        version: ${attn}%s${norm}\n" "$openssl_version"
+
+
+openssl_nopkcs8_keys=false
+if test -n "$OPENSSL_FIPS"; then
+  # NOTES
+  # - OpenSSL 1.0.0* and 1.1.+ does not support FIPS build/mode;
+  # - Usually in FIPS mode keys are in PKCS#8 format by default;
+  # - OpenSSL 1.0.1* before 1.0.1d does not create keys in PKCS#8 format.
+  # => do conversion only for 1.0.1*
+  # Remark used in 2-cre_cakeys.sh.
+  case $openssl_version in
+    1.0.1*)
+      openssl_nopkcs8_keys=:
+      ;;
+  esac
+fi
+
+# Uncomment and modify next if you would like to load(seed) file(s)
+# into the random number generator.
+# Note that some openssl forks fail to process -rand option!
+#random_seed_files=/etc/random-seed
+
+
+# These are the known patent issues with OpenSSL:
+# name   #         expires
+# mdc2:  4,908,861 13/03/2007 - enabled in OpenSSL 1.x branches from 2009-08-12
+# idea:  5,214,703 25/05/2010
+# rc5:   5,724,428 03/03/2015
+#
+# Note the MD2 hash algorithm is considered as weak (2009) and
+# most vendors disable it in openssl. Also from 2009-07-08
+# OpenSSL team disable md2 by default in 0.9.8 and 1.x branches.
+# This is reason md2 to be removed from list starting with
+# "X.509 certificate support version 6.3".
+
+# With support for EC certificates we will limit RSA
+# tests to sha1 only. Comment next line to restore.
+RSA_DIGEST_LIST=${RSA_DIGEST_LIST-sha1}
+
+if test -z "$RSA_DIGEST_LIST"; then
+  for DIGEST in sha1 md5 mdc2 md4 rmd160; do
+    if "$OPENSSL" dgst -$DIGEST "$OPENSSL" >/dev/null 2>&1; then
+      RSA_DIGEST_LIST="$RSA_DIGEST_LIST $DIGEST"
+    fi
+  done
+fi
+if test -z "$RSA_DIGEST_LIST"; then
+  echo "RSA_DIGEST_LIST is empty" >&2
+  exit 1
+fi
+echo "RSA digest list: $RSA_DIGEST_LIST"
+
+
+# === server section:
+
+if test -z "${SSHD_PORT}"; then
+  SSHD_PORT=20022
+fi
+
+SSHD_LISTENADDRESS=127.0.0.1
+#SSHD_LISTENADDRESS=::1
+
+#"yes" or "no"
+SSHSERVER_USEPRIVILEGESEPARATION="yes"
+#SSHSERVER_USEPRIVILEGESEPARATION="no"
+
+SSHSERVER_SYSLOGFACILITY=AUTH
+SSHSERVER_LOGLEVEL=FATAL
+#SSHSERVER_SYSLOGFACILITY=LOCAL3
+#SSHSERVER_LOGLEVEL=DEBUG3
+
+
+# === certificates:
+
+KEY_PASS="change_it"
+CAKEY_PREFIX="catest"
+
+SSH_CAROOT="`pwd`/ca-test"
+
+CACERTFILE="catest-bundle.crt"
+CACRLFILE="catest-bundle.crl"
+
+CACONFIG="catest.config"
+SSH_CACFGFILE="${SSH_CAROOT}/${CACONFIG}"
+
+# always use intermediate CA with rsa key
+SSH_CAKEY_TYPES=rsa
+# comment next to skip intermediate CA with dsa key
+SSH_CAKEY_TYPES="$SSH_CAKEY_TYPES dsa"
+# uncomment next to allow intermediate CA with ed25519 key
+# (requires OpenSSL >= 1.1.1)
+#SSH_CAKEY_TYPES="$SSH_CAKEY_TYPES ed25519"
+# uncomment next to allow intermediate CA with ed448 key
+# (requires OpenSSL >= 1.1.1)
+#SSH_CAKEY_TYPES="$SSH_CAKEY_TYPES ed448"
+
+SSH_SIGN_TYPES=
+for DIGEST in $RSA_DIGEST_LIST ; do
+  SSH_SIGN_TYPES="$SSH_SIGN_TYPES rsa_${DIGEST}"
+done
+if expr "$SSH_CAKEY_TYPES" : .*dsa > /dev/null ; then
+  SSH_SIGN_TYPES="$SSH_SIGN_TYPES dsa"
+fi
+if expr "$SSH_CAKEY_TYPES" : .*ed25519 > /dev/null ; then
+  SSH_SIGN_TYPES="$SSH_SIGN_TYPES ed25519"
+fi
+if expr "$SSH_CAKEY_TYPES" : .*ed448 > /dev/null ; then
+  SSH_SIGN_TYPES="$SSH_SIGN_TYPES ed448"
+fi
+
+SSH_CACERTDAYS=60
+SSH_CACRLDAYS=60
+
+SSH_DN_C="XX"
+SSH_DN_ST="World"
+SSH_DN_L="Somewhere"
+SSH_DN_O="SSH Test Team"
+SSH_DN_OU="SSH Testers"
+SSH_DN_EM="email@not.set"
+
+SSH_DN_UTF8_FLAG='-utf8'
+# '-utf8' flag is added in OpenSSL 0.9.7
+case $openssl_version in
+  *0.9.6*)
+    SSH_DN_UTF8_FLAG=
+    ;;
+  *);;
+esac
+if test -n "$SSH_DN_UTF8_FLAG"; then
+  SSH_DN_SUF=" cyrillic-АБВ-Яабв-я greek-ΑΒΓ-Ωαβγ-ω"
+  SSH_DN_L="$SSH_DN_L$SSH_DN_SUF"
+  SSH_DN_O="$SSH_DN_O$SSH_DN_SUF"
+  SSH_DN_OU="$SSH_DN_OU$SSH_DN_SUF"
+
+  OPENSSL_NAMEOPT="-nameopt utf8,sep_comma_plus" #ok
+  #OPENSSL_NAMEOPT="-nameopt esc_2253,esc_ctrl,esc_msb,utf8,dump_nostr,dump_der,use_quote,sep_comma_plus_space,sname" #fail - esc_msb should be removed
+  #OPENSSL_NAMEOPT="-nameopt esc_2253,esc_ctrl,utf8,dump_nostr,dump_der,use_quote,sep_comma_plus_space,sname" #ok
+  #OPENSSL_NAMEOPT="-nameopt esc_2253,esc_ctrl,-esc_msb,utf8,dump_nostr,dump_der,use_quote,sep_comma_plus_space,sname" #ok
+  #OPENSSL_NAMEOPT="-nameopt esc_2253,esc_ctrl,esc_msb,utf8,dump_nostr,dump_der,use_quote,sep_comma_plus_space,sname,-esc_msb" #ok
+  #OPENSSL_NAMEOPT="-nameopt oneline,-esc_msb,-space_eq" #ok
+  #OPENSSL_NAMEOPT="-nameopt oneline,-esc_msb" #now ok (spaces around '=')
+else
+  OPENSSL_NAMEOPT=
+fi
+
+# OpenSSL control type distinguished item type with string_mask
+# option in [req] section from configuration file.
+# By default option is set to
+# - nombstr (0.9.7x and 0.9.8x)
+# - utf8only (1.0+)
+SSH_DN_FORCE_UTF8=${SSH_DN_FORCE_UTF8-no}
+case $openssl_version in
+  *0.9.6*)
+    # not supported so override environment settings
+    SSH_DN_FORCE_UTF8=no
+    ;;
+esac
+
+# === OCSP:
+# OpenSSL OCSP test responders listen on BASE, BASE+1, ...
+# Set the default base port if is not set by environment.
+SSH_VA_BASEPORT=${SSH_VA_BASEPORT-20080}
+
+# OpenSSL OCSP responder don't use SO_REUSEADDR :-(, so ocsp tests
+# must wait socket to close.
+# Set the default timeout if is not set by environment.
+SSH_OPENSSL_OCSP_TMOUT=${SSH_OPENSSL_OCSP_TMOUT-60}
+
+# === LDAP:
+SSH_LDAP_DB=${SSH_LDAP_DB-bdb}
+# "hdb" backend since openldap 2.2+
+#SSH_LDAP_DB=hdb
+# openldap 2.4+ deprecate "ldbm" backend
+#SSH_LDAP_DB=ldbm
+SSH_LDAP_DC="dc=example,dc=com"
+
+# LDAP test server listen on specified port.
+# Set the default ldap port if is not set by environment.
+LDAPD_PORT=${LDAPD_PORT-20389}
+
+LDAPD_URL="ldap://${SSHD_LISTENADDRESS}:${LDAPD_PORT}"
