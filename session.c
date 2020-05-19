@@ -906,7 +906,9 @@ read_environment_file(char ***env, u_int *envsize,
 		if (whitelist != NULL &&
 		    match_pattern_list(cp, whitelist, 0) != 1)
 			continue;
-		child_set_env(env, envsize, cp, value);
+        /* If environment variable is PATH then don't override it */
+        if (strcasecmp(cp, "PATH") != 0)
+            child_set_env(env, envsize, cp, value);
 	}
 	free(line);
 	fclose(f);
@@ -1041,6 +1043,9 @@ do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 	child_set_env(&env, &envsize, "LOGNAME", pw->pw_name);
 #ifdef _AIX
 	child_set_env(&env, &envsize, "LOGIN", pw->pw_name);
+	/* In AIX PATH variable is not updated, so set here to _PATH_STDPATH */
+	child_set_env(&env, &envsize, "PATH", _PATH_STDPATH);
+    debug3("AIX: PATH is not updated in do_setup_env");
 #endif
 	child_set_env(&env, &envsize, "HOME", pw->pw_dir);
 #ifdef HAVE_LOGIN_CAP
